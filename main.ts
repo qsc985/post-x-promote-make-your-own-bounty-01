@@ -47,6 +47,22 @@ function main() {
     fail('POST.json must contain a non-empty string field "url"');
   }
 
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(parsed.url.trim());
+  } catch {
+    fail(`"url" is not a valid URL: ${parsed.url}`);
+  }
+
+  const host = parsedUrl.hostname.toLowerCase();
+  if (parsedUrl.protocol !== "https:" || (host !== "x.com" && host !== "twitter.com")) {
+    fail(`"url" must be an https://x.com (or twitter.com) link, got: ${parsed.url}`);
+  }
+
+  if (!/^\/[^/]+\/status\/\d+\/?$/.test(parsedUrl.pathname)) {
+    fail(`"url" must be an X status link (https://x.com/<handle>/status/<id>), got: ${parsed.url}`);
+  }
+
   try {
     mkdirSync(OUTPUT_DIR, { recursive: true });
   } catch (err) {
@@ -57,6 +73,18 @@ function main() {
     copyFileSync(sourcePath, targetPath);
   } catch (err) {
     fail(`cannot copy POST.json to ${targetPath}: ${err.message}`);
+  }
+
+  // Verify the copy is byte-identical by re-reading it and comparing
+  // against the source bytes we already hold.
+  let copied;
+  try {
+    copied = readFileSync(targetPath);
+  } catch (err) {
+    fail(`cannot re-read copied POST.json at ${targetPath}: ${err.message}`);
+  }
+  if (!raw.equals(copied)) {
+    fail(`copied POST.json at ${targetPath} differs from ${sourcePath}`);
   }
 }
 
